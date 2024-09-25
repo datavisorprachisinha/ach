@@ -1,7 +1,15 @@
 import json 
 import pandas as pd
+import argparse
 
-file_path = '/Users/prachisinha/Desktop/nasa/raw_nacha_files/aws-uswest2-prod-eng-jumpserver-3/ACHAJ11255077833PDIN20240910150403404.json'
+parser = argparse.ArgumentParser(description="Process some arguments.")
+
+parser.add_argument('-i', '--inputFile', type=str, help='input NACHA')
+parser.add_argument('-o', '--outputFile', type=str, help='output CSV')
+
+args = parser.parse_args()
+
+file_path = args.inputFile
 
 with open(file_path) as f:
     data = json.load(f)
@@ -23,7 +31,7 @@ from batchControl: nothing
 from batchHeader: ODFIIdentification, companyIdentification, companyEntryDescription, companyName, effectiveEntryDate, originatorStatusCode, serviceClassCode, settlementDate, standardEntryClassCode
 from entryDetails (list of entry dicts): DFIAccountNumber, RDFIIdentification, amount, category, discretionaryData, individualName, traceNumber, transactionCode
 from addenda05: paymentRelatedInformation
-from addenda99: addendaInformation, dateOfDeath, dateOfDeath, originalTrace, returnCode
+from addenda99: addendaInformation, dateOfDeath, dateOfDeath, originalTrace, returnCode, originalDFI
 from addenda98: changeCode, correctedData, originalDFI, originalTrace
 
 IATBatchHeader (that is not in batchHeader): ISODestinationCountryCode, ISOOriginatingCurrencyCode, ISODestinationCurrencyCode
@@ -59,57 +67,98 @@ addendaFields['addenda98'] = ['originalDFI', 'originalTrace', 'changeCode', 'cor
 # Returns
 addendaFields['addenda99'] = ['originalDFI', 'originalTrace', 'addendaInformation', 'dateOfDeath', 'returnCode']
 
-batchHeaderFields = ['ODFIIdentification', 'companyIdentification', 'companyEntryDescription', 'companyName', 'effectiveEntryDate', 'originatorStatusCode', 'serviceClassCode', 'settlementDate', 'standardEntryClassCode']
-entryFields = ['DFIAccountNumber', 'RDFIIdentification', 'amount', 'category', 'discretionaryData', 'individualName', 'traceNumber', 'transactionCode', 'OFACScreeningIndicator', 'secondaryOFACScreeningIndicator']
+batchHeaderFields = ['ODFIIdentification', 'companyIdentification', 'companyEntryDescription',\
+                      'companyName', 'effectiveEntryDate', 'originatorStatusCode',\
+                          'serviceClassCode', 'settlementDate', 'standardEntryClassCode']
+entryFields = ['DFIAccountNumber', 'RDFIIdentification', 'amount',\
+                'category', 'discretionaryData', 'individualName',\
+                      'traceNumber', 'transactionCode', 'OFACScreeningIndicator',\
+                          'secondaryOFACScreeningIndicator']
 addOnFields = ['traceNumberJoinKey']
 
-all_fields = batchHeaderFields + entryFields + [field for fields in addendaFields.values for field in fields] + addOnFields
+all_fields = []
+uniq = set()
 
-def get_data(recordType, batchHeader, batchData):
+for lst in (batchHeaderFields, entryFields, [field for fields in addendaFields.values() for field in fields], addOnFields):
+    for item in lst:
+        if item not in uniq:
+            uniq.add(item)
+            all_fields.append(item)
+
+print(all_fields)
+
+# all_fields = ['ODFIIdentification', 'companyIdentification', 'companyEntryDescription',\
+#                'companyName', 'effectiveEntryDate', 'originatorStatusCode',\
+#                 'serviceClassCode', 'settlementDate', 'standardEntryClassCode',\
+#                 'DFIAccountNumber', 'RDFIIdentification', 'amount',\
+#                 'category', 'discretionaryData', 'individualName',\
+#                 'traceNumber', 'transactionCode', 'OFACScreeningIndicator',\
+#                 'secondaryOFACScreeningIndicator', 'paymentRelatedInformation', 'transactionTypeCode',\
+#                 'foreignPaymentAmount', 'name', 'originatorName',\
+#                 'originatorStreetAddress', 'originatorCityStateProvince', 'originatorCountryPostalCode',\
+#                 'ODFIName', 'ODFIIDNumberQualifier', 'ODFIBranchCountryCode',\
+#                 'RDFIName', 'RDFIIDNumberQualifier', 'RDFIBranchCountryCode',\
+#                 'receiverIDNumber', 'receiverStreetAddress', 'receiverCityStateProvince',\
+#                 'receiverCountryPostalCode', 'originalDFI', 'originalTrace',\
+#                 'changeCode', 'correctedData', 'addendaInformation',\
+#                 'dateOfDeath', 'returnCode', 'traceNumberJoinKey']
+
+def get_data(recordType, batch):
     all_rows = []
-    if record_type == 'IATBatches':
+    if recordType == 'IATBatches':
         batchHeader = batch["IATBatchHeader"]
         entries = batch["IATEntryDetails"]
     else:
         batchHeader = batch["batchHeader"]
         entries = batch["entryDetails"]
 
-    batchData = [str(batchHeader.get(field, "")).strip() for field in batchHeaderFields]
+    batchData = {field: str(batchHeader.get(field, "")).strip() for field in batchHeaderFields}
+    # batchHeaderData = [str(batchHeader.get(field, "")).strip() for field in batchHeaderFields]
 
     for entry in entries:
-        full_data = {}
-        entryData = [str(entry.get(field, "")).strip() for field in entryFields]
+        # fullData = []
+        # fullData += batchHeaderData
 
-        for addenda, fields in addendaFields.itmes():
-            if addenda in entry:
-                addendaData = entry[addenda]
+        entryData = {field: str(entry.get(field, "")).strip() for field in entryFields}
+        # fullData += [str(entry.get(field, "")).strip() for field in entryFields]
+
+        # addendaData = {}
+        for addendaType, fields in addendaFields.items():
+            if addendaType in entry:
+                raw_addenda = entry[addendaType]
                 # if addenda is list instead of dict, only looking at first item in list for now
-                if isinstance(addendaData, list):
-                    addendaData = addendaData[0]
-                for field in fields:
-                    full_data[field] = str(addendaData.get(field, "")).strip()
+                if isinstance(raw_addenda, list):
+                    raw_addenda = raw_addenda[0]
+                # fullData += [str(raw_addenda.get(field, "")).strip() for field in fields]
+                addendaData = {field: str(raw_addenda.get(field, "")).strip() for field in fields}
+            else:
+                pass
+                # populate with empty strings for addenda fields that are not applicable
+                # fullData += [""]*len(fields)
         
         # not sure what IAT return looks like since the batch header is different
-        'ODFIIdentification', 'companyIdentification', 'companyEntryDescription', 'companyName', 'effectiveEntryDate', 'originatorStatusCode', 'serviceClassCode', 'settlementDate', 'standardEntryClassCode'
-        traceNumberJoinKey = full_data.get('')
+        # 'ODFIIdentification', 'companyIdentification', 'companyEntryDescription', 'companyName', 'effectiveEntryDate', 'originatorStatusCode', 'serviceClassCode', 'settlementDate', 'standardEntryClassCode'
+        # traceNumberJoinKey = full_data.get('')
 
-        full_data = batchData + entryData + addenda05Data + addenda99Data + addenda98Data + addendaCommonData
-        all_rows.append(full_data)
+        fullData = batchData | entryData | addendaData
+        # all_rows.append(fullData)
+        all_rows.append(str(fullData.get(field, "")).strip() for field in all_fields)
     return all_rows
     
 all_data = []
 
-for record_type in ['NotificationOfChange', 'batches', 'ReturnEntries']:
+for recordType in ['IATBatches', 'NotificationOfChange', 'batches', 'ReturnEntries']:
     # print(data[record_type])
-    if data[record_type] != None:
-        for batch in data.get(record_type, []):
-            all_data += get_data(batch)
+    if data[recordType] != None:
+        for batch in data.get(recordType, []):
+            all_data += get_data(recordType, batch)
 
 # Create the DataFrame
 df = pd.DataFrame(all_data, columns=all_fields)
 
 # save the DataFrame to a CSV file
-out_path = '/Users/prachisinha/Desktop/nasa/raw_nacha_files/aws-uswest2-prod-eng-jumpserver-3/ACHAJ11255077833PDIN20240910150403404_parsed.csv'
+out_path = args.outputFile
+
 df.to_csv(out_path, index=False)
 
 print(f"Data has been saved to {out_path}")
