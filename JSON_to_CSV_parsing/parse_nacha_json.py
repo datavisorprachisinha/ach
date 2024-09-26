@@ -85,8 +85,6 @@ for lst in (batchHeaderFields, entryFields, [field for fields in addendaFields.v
             uniq.add(item)
             all_fields.append(item)
 
-print(all_fields)
-
 # all_fields = ['ODFIIdentification', 'companyIdentification', 'companyEntryDescription',\
 #                'companyName', 'effectiveEntryDate', 'originatorStatusCode',\
 #                 'serviceClassCode', 'settlementDate', 'standardEntryClassCode',\
@@ -122,7 +120,7 @@ def get_data(recordType, batch):
         entryData = {field: str(entry.get(field, "")).strip() for field in entryFields}
         # fullData += [str(entry.get(field, "")).strip() for field in entryFields]
 
-        # addendaData = {}
+        addendaData = {}
         for addendaType, fields in addendaFields.items():
             if addendaType in entry:
                 raw_addenda = entry[addendaType]
@@ -130,7 +128,7 @@ def get_data(recordType, batch):
                 if isinstance(raw_addenda, list):
                     raw_addenda = raw_addenda[0]
                 # fullData += [str(raw_addenda.get(field, "")).strip() for field in fields]
-                addendaData = {field: str(raw_addenda.get(field, "")).strip() for field in fields}
+                addendaData.update({field: str(raw_addenda.get(field, "")).strip() for field in fields})
             else:
                 pass
                 # populate with empty strings for addenda fields that are not applicable
@@ -142,14 +140,14 @@ def get_data(recordType, batch):
 
         fullData = batchData | entryData | addendaData
         # all_rows.append(fullData)
-        all_rows.append(str(fullData.get(field, "")).strip() for field in all_fields)
+        all_rows.append([str(fullData.get(field, "")).strip() for field in all_fields])
     return all_rows
     
 all_data = []
 
 for recordType in ['IATBatches', 'NotificationOfChange', 'batches', 'ReturnEntries']:
     # print(data[record_type])
-    if data[recordType] != None:
+    if data.get(recordType, None) != None:
         for batch in data.get(recordType, []):
             all_data += get_data(recordType, batch)
 
