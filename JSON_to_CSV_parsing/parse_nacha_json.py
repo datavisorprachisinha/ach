@@ -10,6 +10,7 @@ parser.add_argument('-o', '--outputFile', type=str, help='output CSV')
 args = parser.parse_args()
 
 file_path = args.inputFile
+out_path = args.outputFile
 
 with open(file_path) as f:
     data = json.load(f)
@@ -111,14 +112,10 @@ def get_data(recordType, batch):
         entries = batch["entryDetails"]
 
     batchData = {field: str(batchHeader.get(field, "")).strip() for field in batchHeaderFields}
-    # batchHeaderData = [str(batchHeader.get(field, "")).strip() for field in batchHeaderFields]
 
     for entry in entries:
-        # fullData = []
-        # fullData += batchHeaderData
 
         entryData = {field: str(entry.get(field, "")).strip() for field in entryFields}
-        # fullData += [str(entry.get(field, "")).strip() for field in entryFields]
 
         addendaData = {}
         for addendaType, fields in addendaFields.items():
@@ -127,36 +124,25 @@ def get_data(recordType, batch):
                 # if addenda is list instead of dict, only looking at first item in list for now
                 if isinstance(raw_addenda, list):
                     raw_addenda = raw_addenda[0]
-                # fullData += [str(raw_addenda.get(field, "")).strip() for field in fields]
                 addendaData.update({field: str(raw_addenda.get(field, "")).strip() for field in fields})
-            else:
-                pass
-                # populate with empty strings for addenda fields that are not applicable
-                # fullData += [""]*len(fields)
         
-        # not sure what IAT return looks like since the batch header is different
+        # TO-DO: create unique join key to link transactions and returns
         # 'ODFIIdentification', 'companyIdentification', 'companyEntryDescription', 'companyName', 'effectiveEntryDate', 'originatorStatusCode', 'serviceClassCode', 'settlementDate', 'standardEntryClassCode'
         # traceNumberJoinKey = full_data.get('')
 
         fullData = batchData | entryData | addendaData
-        # all_rows.append(fullData)
         all_rows.append([str(fullData.get(field, "")).strip() for field in all_fields])
     return all_rows
     
 all_data = []
 
 for recordType in ['IATBatches', 'NotificationOfChange', 'batches', 'ReturnEntries']:
-    # print(data[record_type])
     if data.get(recordType, None) != None:
         for batch in data.get(recordType, []):
             all_data += get_data(recordType, batch)
 
-# Create the DataFrame
+# Create the DataFrame and save to file
 df = pd.DataFrame(all_data, columns=all_fields)
-
-# save the DataFrame to a CSV file
-out_path = args.outputFile
-
 df.to_csv(out_path, index=False)
 
 print(f"Data has been saved to {out_path}")
