@@ -173,7 +173,7 @@ for recordType in ['IATBatches', 'NotificationOfChange', 'batches', 'ReturnEntri
 # Create the DataFrame and save to file
 df = pd.DataFrame(all_data, columns=all_fields)
 
-# TO-DO; check if this is ok to drop actually lol
+# TO-DO: check if this is ok to drop actually lol
 # if all values identicial - duplicate row drop (observed that sometimes entry seems to be repeated in batches and ReturnEntries)
 df = df.drop_duplicates()
 
@@ -186,7 +186,7 @@ if len(duplicated_rows) > 0:
 
 df.to_csv(out_path, index=False)
 
-print(f"Data has been saved to {out_path}")
+print(f"\nData has been saved to {out_path}")
 
 
     
