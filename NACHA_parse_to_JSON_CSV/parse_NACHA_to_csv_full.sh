@@ -42,11 +42,15 @@ for file in "$DIRECTORY"/*; do
 
         csv_file="$CSVDIR/$base_filename.csv"
 
+        ########## uses moov ach docker image to convert raw NACHA to JSON - comment out if you already have JSON files in folder with specified name
         # create the file and save the JSON conversion (need docker container to be running for this!!)
         curl -X POST --data-binary "@$file" http://localhost:8080/files/create  > "$json_file"
 
         # Clean up moov's JSON conversion output and convert to CSV
         python3 moov_output_cleaned.py -f "$json_file"
+        ##########
+
+        # parse JSON to CSV
         python3 parse_nacha_json.py -i "$json_file" -o "$csv_file"
     else
         echo "No files found in the directory."

@@ -22,9 +22,6 @@ IATBatches
 NotificationOfChange
 ReturnEntries
 batches
-
-3 types of addenda observed: addenda05 (additional payment info), addenda98 (notification of change), addenda99 (return)
-category: Forward, Return, NOC
 '''
 
 '''
@@ -75,7 +72,9 @@ entryFields = ['DFIAccountNumber', 'RDFIIdentification', 'amount',\
                 'category', 'discretionaryData', 'individualName',\
                       'traceNumber', 'transactionCode', 'OFACScreeningIndicator',\
                           'secondaryOFACScreeningIndicator']
-addOnFields = ['traceNumberJoinKey']
+IATbatchControlFields = ['companyIdentification']
+joinKeyFields = ['companyIdentification', 'ODFIIdentification', 'companyEntryDescription', 'effectiveEntryDate', 'originatorStatusCode', 'settlementDate', 'standardEntryClassCode']
+addOnFields = ['traceJoinKey']
 
 all_fields = []
 uniq = set()
@@ -107,6 +106,7 @@ def get_data(recordType, batch):
     if recordType == 'IATBatches':
         batchHeader = batch["IATBatchHeader"]
         entries = batch["IATEntryDetails"]
+        batchControl = batch['batchControl']
     else:
         batchHeader = batch["batchHeader"]
         entries = batch["entryDetails"]
@@ -126,12 +126,41 @@ def get_data(recordType, batch):
                     raw_addenda = raw_addenda[0]
                 addendaData.update({field: str(raw_addenda.get(field, "")).strip() for field in fields})
         
-        # TO-DO: create unique join key to link transactions and returns
-        # 'ODFIIdentification', 'companyIdentification', 'companyEntryDescription', 'companyName', 'effectiveEntryDate', 'originatorStatusCode', 'serviceClassCode', 'settlementDate', 'standardEntryClassCode'
-        # traceNumberJoinKey = full_data.get('')
+        '''
+        Additional info plus trace number for unique join key
+
+        https://dev-ach-guide.pantheonsite.io/ach-file-overview
+        Each batch starts with a single "Batch Header Record," which begins with "5," and describes the 
+        type (debits and/or credits) and 
+        purpose of all transaction entries within the batch. 
+        This record identifies your company as the originator, 
+        as well as provides a description (e.g., “gas bill” or “salary”) for all of the transactions in the batch.
+
+        This record also specifies the date the transactions are supposed to post in the Receiver's account. 
+        Any variation of any of the information in a batch header would call for a separate batch 
+        (like a different description of “bonus” instead of “salary,” different effective date, or company ID or name). 
+        All payments within a single batch represent transactions for a single company or originator.
+        
+        certain transactions will be batched together - where the Standard Entry Class (SEC) Code, effective entry date, company ID, and Batch descriptor are identical, based on similar information required at the element level. 
+        
+        IAT: no company name, company ID in batchControl
+        '''
 
         fullData = batchData | entryData | addendaData
-        all_rows.append([str(fullData.get(field, "")).strip() for field in all_fields])
+
+        if recordType == 'IATBatches':
+            fullData['companyIdentification'] = batchControl['companyIdentification']
+
+        if fullData.get("category") == "Return" or fullData.get("category") == "NOC":
+            trace = fullData.get('originalTrace', "")
+        else:
+            trace = fullData.get('traceNumber', "")
+
+        traceJoinKey = f'{trace}-'
+        traceJoinKey += '-'.join([str(fullData.get(field, "")) for field in joinKeyFields])
+        fullData['traceJoinKey'] = traceJoinKey
+
+        all_rows.append([str(fullData.get(field, "")) for field in all_fields])
     return all_rows
     
 all_data = []
@@ -143,6 +172,18 @@ for recordType in ['IATBatches', 'NotificationOfChange', 'batches', 'ReturnEntri
 
 # Create the DataFrame and save to file
 df = pd.DataFrame(all_data, columns=all_fields)
+
+# TO-DO; check if this is ok to drop actually lol
+# if all values identicial - duplicate row drop (observed that sometimes entry seems to be repeated in batches and ReturnEntries)
+df = df.drop_duplicates()
+
+# checking if any trace keys duplicated
+duplicated_rows = df[df['traceJoinKey'].duplicated(keep=False)]
+duplicated_rows = duplicated_rows.sort_values(by='traceJoinKey')
+if len(duplicated_rows) > 0:
+    duplicated_rows.to_csv(out_path.replace(".csv", "_duprows.csv"), index=False)
+    print(len(duplicated_rows))
+
 df.to_csv(out_path, index=False)
 
 print(f"Data has been saved to {out_path}")
