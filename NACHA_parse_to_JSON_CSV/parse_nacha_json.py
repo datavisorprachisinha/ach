@@ -14,35 +14,6 @@ out_path = args.outputFile
 
 with open(file_path) as f:
     data = json.load(f)
-  
-
-'''
-four high level groups in JSON of interest
-IATBatches
-NotificationOfChange
-ReturnEntries
-batches
-'''
-
-'''
-from batchControl: nothing
-from batchHeader: ODFIIdentification, companyIdentification, companyEntryDescription, companyName, effectiveEntryDate, originatorStatusCode, serviceClassCode, settlementDate, standardEntryClassCode
-from entryDetails (list of entry dicts): DFIAccountNumber, RDFIIdentification, amount, category, discretionaryData, individualName, traceNumber, transactionCode
-from addenda05: paymentRelatedInformation
-from addenda99: addendaInformation, dateOfDeath, dateOfDeath, originalTrace, returnCode, originalDFI
-from addenda98: changeCode, correctedData, originalDFI, originalTrace
-
-IATBatchHeader (that is not in batchHeader): ISODestinationCountryCode, ISOOriginatingCurrencyCode, ISODestinationCurrencyCode
-IATEntryDetails: (additional to entryDetails): OFACScreeningIndicator, secondaryOFACScreeningIndicator
-addenda10: transactionTypeCode, foreignPaymentAmount
-addenda11: name, originatorName, originatorStreetAddress
-addenda12: originatorCityStateProvince, originatorCountryPostalCode
-addenda13: ODFIName, ODFIIDNumberQualifier, ODFIIdentification, ODFIBranchCountryCode
-addenda14: RDFIName, RDFIIDNumberQualifier, RDFIBranchCountryCode (RDFIIdentification also included in entry details)
-addenda15: receiverIDNumber, receiverStreetAddress
-addenda16: receiverCityStateProvince, receiverCountryPostalCode
-addenda17: paymentRelatedInformation
-'''
 
 addendaFields = {}
 
@@ -51,7 +22,7 @@ addendaFields['addenda05'] = ['paymentRelatedInformation']
 
 # IAT
 addendaFields['addenda10'] = ['transactionTypeCode', 'foreignPaymentAmount']
-addendaFields['addenda11'] = ['name', 'originatorName', 'originatorStreetAddress']
+addendaFields['addenda11'] = ['originatorName', 'originatorStreetAddress']
 addendaFields['addenda12'] = ['originatorCityStateProvince', 'originatorCountryPostalCode']
 addendaFields['addenda13'] = ['ODFIName', 'ODFIIDNumberQualifier', 'ODFIIdentification', 'ODFIBranchCountryCode']
 addendaFields['addenda14'] = ['RDFIName', 'RDFIIDNumberQualifier', 'RDFIBranchCountryCode']
@@ -65,41 +36,39 @@ addendaFields['addenda98'] = ['originalDFI', 'originalTrace', 'changeCode', 'cor
 # Returns
 addendaFields['addenda99'] = ['originalDFI', 'originalTrace', 'addendaInformation', 'dateOfDeath', 'returnCode']
 
-batchHeaderFields = ['ODFIIdentification', 'companyIdentification', 'companyEntryDescription',\
-                      'companyName', 'effectiveEntryDate', 'originatorStatusCode',\
-                          'serviceClassCode', 'settlementDate', 'standardEntryClassCode']
-entryFields = ['DFIAccountNumber', 'RDFIIdentification', 'amount',\
-                'category', 'discretionaryData', 'individualName',\
-                      'traceNumber', 'transactionCode', 'OFACScreeningIndicator',\
-                          'secondaryOFACScreeningIndicator']
+fileHeaderFields = ['immediateDestination', 'immediateDestinationName', 'immediateOrigin', 'immediateOriginName']
+
+batchHeaderFields = ['ODFIIdentification', 'companyIdentification', 'companyEntryDescription', 'companyName', 'effectiveEntryDate',\
+                      'serviceClassCode', 'settlementDate', 'standardEntryClassCode']
+
+entryFields = ['DFIAccountNumber', 'amount', 'category', 'discretionaryData', 'individualName',\
+                'traceNumber', 'transactionCode', 'OFACScreeningIndicator', 'secondaryOFACScreeningIndicator']
+
 IATbatchControlFields = ['companyIdentification']
-joinKeyFields = ['companyIdentification', 'ODFIIdentification', 'companyEntryDescription', 'effectiveEntryDate', 'originatorStatusCode', 'settlementDate', 'standardEntryClassCode']
-addOnFields = ['traceJoinKey']
 
-all_fields = []
-uniq = set()
+joinKeyFields = ['companyIdentification', 'ODFIIdentification', 'companyEntryDescription', 'effectiveEntryDate', 'settlementDate', 'standardEntryClassCode']
 
-for lst in (batchHeaderFields, entryFields, [field for fields in addendaFields.values() for field in fields], addOnFields):
-    for item in lst:
-        if item not in uniq:
-            uniq.add(item)
-            all_fields.append(item)
+addOnFields = ['traceJoinKey', 'debitOrCredit']
 
-# all_fields = ['ODFIIdentification', 'companyIdentification', 'companyEntryDescription',\
-#                'companyName', 'effectiveEntryDate', 'originatorStatusCode',\
-#                 'serviceClassCode', 'settlementDate', 'standardEntryClassCode',\
-#                 'DFIAccountNumber', 'RDFIIdentification', 'amount',\
-#                 'category', 'discretionaryData', 'individualName',\
-#                 'traceNumber', 'transactionCode', 'OFACScreeningIndicator',\
-#                 'secondaryOFACScreeningIndicator', 'paymentRelatedInformation', 'transactionTypeCode',\
-#                 'foreignPaymentAmount', 'name', 'originatorName',\
-#                 'originatorStreetAddress', 'originatorCityStateProvince', 'originatorCountryPostalCode',\
-#                 'ODFIName', 'ODFIIDNumberQualifier', 'ODFIBranchCountryCode',\
-#                 'RDFIName', 'RDFIIDNumberQualifier', 'RDFIBranchCountryCode',\
-#                 'receiverIDNumber', 'receiverStreetAddress', 'receiverCityStateProvince',\
-#                 'receiverCountryPostalCode', 'originalDFI', 'originalTrace',\
-#                 'changeCode', 'correctedData', 'addendaInformation',\
-#                 'dateOfDeath', 'returnCode', 'traceNumberJoinKey']
+# generates column headers list
+# all_fields = []
+# uniq = set()
+# for lst in (batchHeaderFields, entryFields, [field for fields in addendaFields.values() for field in fields], addOnFields):
+#     for item in lst:
+#         if item not in uniq:
+#             uniq.add(item)
+#             all_fields.append(item)
+
+all_fields = ['category', 'effectiveEntryDate', 'settlementDate', 'ODFIIdentification', 'immediateDestination', 'immediateDestinationName', 'immediateOrigin', 'immediateOriginName', 'serviceClassCode', 'standardEntryClassCode', 'transactionCode', 'debitOrCredit',\
+              'companyIdentification', 'companyName', 'companyEntryDescription',\
+                'DFIAccountNumber', 'amount', 'discretionaryData', 'individualName', \
+                'paymentRelatedInformation', \
+                'returnCode', 'originalDFI', 'addendaInformation', 'dateOfDeath', \
+                'changeCode', 'correctedData',\
+                'transactionTypeCode', 'foreignPaymentAmount', 'originatorName', 'originatorStreetAddress','originatorCityStateProvince', 'originatorCountryPostalCode','ODFIName', 'ODFIIDNumberQualifier', 'ODFIBranchCountryCode','RDFIName', 'RDFIIDNumberQualifier', 'RDFIBranchCountryCode','receiverIDNumber', 'receiverStreetAddress','receiverCityStateProvince', 'receiverCountryPostalCode',\
+                'traceNumber', 'originalTrace', 'traceJoinKey']
+
+fileHeaderData = {field: str(data['fileHeader'].get(field, "")).strip() for field in fileHeaderFields}
 
 def get_data(recordType, batch):
     all_rows = []
@@ -125,6 +94,8 @@ def get_data(recordType, batch):
                 if isinstance(raw_addenda, list):
                     raw_addenda = raw_addenda[0]
                 addendaData.update({field: str(raw_addenda.get(field, "")).strip() for field in fields})
+            else:
+                addendaData.update({field: "" for field in fields})
         
         '''
         Additional info plus trace number for unique join key
@@ -146,7 +117,7 @@ def get_data(recordType, batch):
         IAT: no company name, company ID in batchControl
         '''
 
-        fullData = batchData | entryData | addendaData
+        fullData = fileHeaderData | batchData | entryData | addendaData
 
         if recordType == 'IATBatches':
             fullData['companyIdentification'] = batchControl['companyIdentification']
@@ -160,7 +131,23 @@ def get_data(recordType, batch):
         traceJoinKey += '-'.join([str(fullData.get(field, "")) for field in joinKeyFields])
         fullData['traceJoinKey'] = traceJoinKey
 
-        all_rows.append([str(fullData.get(field, "")) for field in all_fields])
+        # determining if debit/credit using service class code and/or transaction code
+        serviceClassCode = fullData['serviceClassCode']
+        transactionCode = fullData['transactionCode']
+        if serviceClassCode == "220":
+            fullData['debitOrCredit'] = "Credit"
+        if serviceClassCode == "225":
+            fullData['debitOrCredit'] = "Debit"
+        else:
+            if transactionCode in {'21', '22', '23', '24', '31', '32', '33', '24'}:
+                fullData['debitOrCredit'] = 'Credit'
+            elif transactionCode in {'26', '27', '28', '29', '36', '37', '38', '39'}:
+                fullData['debitOrCredit'] = 'Credit'
+            else:
+                fullData['debitOrCredit'] = ""
+
+        # all_rows.append([str(fullData.get(field, "")) for field in all_fields])
+        all_rows.append(fullData)
     return all_rows
     
 all_data = []
@@ -182,7 +169,7 @@ duplicated_rows = df[df['traceJoinKey'].duplicated(keep=False)]
 duplicated_rows = duplicated_rows.sort_values(by='traceJoinKey')
 if len(duplicated_rows) > 0:
     duplicated_rows.to_csv(out_path.replace(".csv", "_duprows.csv"), index=False)
-    print(len(duplicated_rows))
+    print('FOUND DUP TRACE JOIN KEYS', len(duplicated_rows))
 
 df.to_csv(out_path, index=False)
 
